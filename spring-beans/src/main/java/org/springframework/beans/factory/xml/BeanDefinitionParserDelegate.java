@@ -439,7 +439,7 @@ public class BeanDefinitionParserDelegate {
 			checkNameUniqueness(beanName, aliases, ele);
 		}
 
-		// 构建 BeanDefinition。
+		// 进一步解析并构建 BeanDefinition。
 		AbstractBeanDefinition beanDefinition = parseBeanDefinitionElement(ele, beanName, containingBean);
 		if (beanDefinition != null) {
 			// 如果 beanName 还是为空。
@@ -512,10 +512,12 @@ public class BeanDefinitionParserDelegate {
 		this.parseState.push(new BeanEntry(beanName));
 
 		String className = null;
+		// 获取 <bean> 的 class。
 		if (ele.hasAttribute(CLASS_ATTRIBUTE)) {
 			className = ele.getAttribute(CLASS_ATTRIBUTE).trim();
 		}
 		String parent = null;
+		// 获取 <bean> 的 parent。
 		if (ele.hasAttribute(PARENT_ATTRIBUTE)) {
 			parent = ele.getAttribute(PARENT_ATTRIBUTE);
 		}
@@ -524,14 +526,21 @@ public class BeanDefinitionParserDelegate {
 			AbstractBeanDefinition bd = createBeanDefinition(className, parent);
 
 			parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
+			// 解析并获取 description。
 			bd.setDescription(DomUtils.getChildElementValueByTagName(ele, DESCRIPTION_ELEMENT));
 
+			// 解析元数据。
 			parseMetaElements(ele, bd);
+			// 解析 lookup-method 属性。
 			parseLookupOverrideSubElements(ele, bd.getMethodOverrides());
+			// 解析 replaced-method 属性。
 			parseReplacedMethodSubElements(ele, bd.getMethodOverrides());
 
+			// 解析构造器参数。
 			parseConstructorArgElements(ele, bd);
+			// 解析 property 子元素。
 			parsePropertyElements(ele, bd);
+			// 解析 qualifier 子元素。
 			parseQualifierElements(ele, bd);
 
 			bd.setResource(this.readerContext.getResource());
