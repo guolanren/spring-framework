@@ -134,6 +134,10 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 * Create new XmlBeanDefinitionReader for the given bean factory.
 	 * @param registry the BeanFactory to load bean definitions into,
 	 * in the form of a BeanDefinitionRegistry
+	 *
+	 * XmlBeanDefinitionReader 唯一的构造器。
+	 * 需要指定 BeanDefinitionRegistry，读取到的 Bean 定义，将转为 BeanDeinitionRegistry 对象，进行注册。
+	 * 实际调用父类 AbstractBeanDefinitionReader 的构造器完成初始化。
 	 */
 	public XmlBeanDefinitionReader(BeanDefinitionRegistry registry) {
 		super(registry);
@@ -301,6 +305,7 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 */
 	@Override
 	public int loadBeanDefinitions(Resource resource) throws BeanDefinitionStoreException {
+		// 使用默认编码，字符集封装 Resource。
 		return loadBeanDefinitions(new EncodedResource(resource));
 	}
 
@@ -317,22 +322,29 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 			logger.info("Loading XML bean definitions from " + encodedResource);
 		}
 
+		// 获取当前线程中，正在被加载的 Resource 集合(ThreadLoad 变量)
+		// 用于检测配置文件是否存在循环 import。
 		Set<EncodedResource> currentResources = this.resourcesCurrentlyBeingLoaded.get();
+		// 如果当前线程还没有设置 currentResources，则初始化一个。
 		if (currentResources == null) {
 			currentResources = new HashSet<>(4);
 			this.resourcesCurrentlyBeingLoaded.set(currentResources);
 		}
+		// 添加失败意味着已经循环 import
 		if (!currentResources.add(encodedResource)) {
 			throw new BeanDefinitionStoreException(
 					"Detected cyclic loading of " + encodedResource + " - check your import definitions!");
 		}
 		try {
+			// 构建 InputSource，后面 DocumentBuilder 解析的 xml 文件就是被封装成 InputSource。
 			InputStream inputStream = encodedResource.getResource().getInputStream();
 			try {
 				InputSource inputSource = new InputSource(inputStream);
+				// 设置编码，有的话。
 				if (encodedResource.getEncoding() != null) {
 					inputSource.setEncoding(encodedResource.getEncoding());
 				}
+				// 执行真正的加载 BeanDefinition 方法。
 				return doLoadBeanDefinitions(inputSource, encodedResource.getResource());
 			}
 			finally {
@@ -344,7 +356,9 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 					"IOException parsing XML document from " + encodedResource.getResource(), ex);
 		}
 		finally {
+			// 加载完毕，从正在被加载集合中移除。
 			currentResources.remove(encodedResource);
+			// 如果 currentResources 已经为空了，使用 ThreadLocal#remove() 移除，避免内存泄漏。
 			if (currentResources.isEmpty()) {
 				this.resourcesCurrentlyBeingLoaded.remove();
 			}
@@ -388,7 +402,9 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	protected int doLoadBeanDefinitions(InputSource inputSource, Resource resource)
 			throws BeanDefinitionStoreException {
 		try {
+			// 解析 InputSource，加载 Document。
 			Document doc = doLoadDocument(inputSource, resource);
+			// 使用 Document 注册 BeanDefinition。
 			return registerBeanDefinitions(doc, resource);
 		}
 		catch (BeanDefinitionStoreException ex) {
@@ -439,10 +455,12 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 * @see #detectValidationMode
 	 */
 	protected int getValidationModeForResource(Resource resource) {
+		// 如果手动设置了 xml 文件的验证模式，则使用手动的验证模式
 		int validationModeToUse = getValidationMode();
 		if (validationModeToUse != VALIDATION_AUTO) {
 			return validationModeToUse;
 		}
+		// 解析配置文件，获取验证模式。
 		int detectedMode = detectValidationMode(resource);
 		if (detectedMode != VALIDATION_AUTO) {
 			return detectedMode;
@@ -450,6 +468,7 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 		// Hmm, we didn't get a clear indication... Let's assume XSD,
 		// since apparently no DTD declaration has been found up until
 		// detection stopped (before finding the document's root tag).
+		// 默认使用 XSD 验证模式。
 		return VALIDATION_XSD;
 	}
 
@@ -503,9 +522,13 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 * @see BeanDefinitionDocumentReader#registerBeanDefinitions
 	 */
 	public int registerBeanDefinitions(Document doc, Resource resource) throws BeanDefinitionStoreException {
+		// 创建一个 BeanDefinitionDocumentReader 用于读取 Document。
 		BeanDefinitionDocumentReader documentReader = createBeanDefinitionDocumentReader();
+		// 先获取注册表中已有的 BeanDefinition 数目。
 		int countBefore = getRegistry().getBeanDefinitionCount();
+		// 注册 BeanDefinition。
 		documentReader.registerBeanDefinitions(doc, createReaderContext(resource));
+		// 计算出本次添加的 BeanDefinition 数目。
 		return getRegistry().getBeanDefinitionCount() - countBefore;
 	}
 

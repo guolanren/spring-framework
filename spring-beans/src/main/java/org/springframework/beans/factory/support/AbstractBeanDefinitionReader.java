@@ -85,17 +85,22 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 		this.registry = registry;
 
 		// Determine ResourceLoader to use.
+		// 入参 registry 是一个 ResourceLoader 的话，则使用它作为 ResourceLoader(资源加载器)。
+		// 一般指的是 ApplicationContext，它相对于 BeanFactory 拓展了 ResourceLoader 等一些功能。
 		if (this.registry instanceof ResourceLoader) {
 			this.resourceLoader = (ResourceLoader) this.registry;
 		}
+		// 入参 registry 只是一个普通的 BeanDefinitionRegistry，则使用默认的 PathMatchingResourcePatternResolver 作为 ResourceLoader(资源加载器)。
 		else {
 			this.resourceLoader = new PathMatchingResourcePatternResolver();
 		}
 
 		// Inherit Environment if possible
+		// 同样的，入参 registry 是一个 EnvironmentCapable 的话，则使用它的 Environment。
 		if (this.registry instanceof EnvironmentCapable) {
 			this.environment = ((EnvironmentCapable) this.registry).getEnvironment();
 		}
+		// 否侧，创建一个默认的 StandardEnvironment。
 		else {
 			this.environment = new StandardEnvironment();
 		}
@@ -210,6 +215,10 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 	 * @see #loadBeanDefinitions(org.springframework.core.io.Resource[])
 	 */
 	public int loadBeanDefinitions(String location, @Nullable Set<Resource> actualResources) throws BeanDefinitionStoreException {
+		// 获取 ResourceLoader。
+		// 构造 BeanDefinitionReader 时进行过设置，
+		// 使用 registry 作为 ResourceLoader 或者创建一个 PathMatchingResourcePatternResolver，
+		// 如果 registry 不是 ResourceLoader。
 		ResourceLoader resourceLoader = getResourceLoader();
 		if (resourceLoader == null) {
 			throw new BeanDefinitionStoreException(
@@ -219,8 +228,11 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 		if (resourceLoader instanceof ResourcePatternResolver) {
 			// Resource pattern matching available.
 			try {
+				// 可以通过模式去匹配多个配置文件，封装成 Resource。
 				Resource[] resources = ((ResourcePatternResolver) resourceLoader).getResources(location);
+				// 使用重载方法，传入 Resources 加载 BeanDefinition。
 				int loadCount = loadBeanDefinitions(resources);
+				// actualResources 是一个存储了已经被处理过的 Resource 集合，可以用来指示调用者忽略那些 Resource。
 				if (actualResources != null) {
 					for (Resource resource : resources) {
 						actualResources.add(resource);
@@ -229,6 +241,7 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 				if (logger.isDebugEnabled()) {
 					logger.debug("Loaded " + loadCount + " bean definitions from location pattern [" + location + "]");
 				}
+				// 返回加载 BeanDefinition 的数量。
 				return loadCount;
 			}
 			catch (IOException ex) {
@@ -236,8 +249,10 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 						"Could not resolve bean definition resource pattern [" + location + "]", ex);
 			}
 		}
+		// 如果 resourceLoader 不是 ResourcePatternResolver。
 		else {
 			// Can only load single resources by absolute URL.
+			// 这个解析器只能加载一个绝对路径 URL 资源。
 			Resource resource = resourceLoader.getResource(location);
 			int loadCount = loadBeanDefinitions(resource);
 			if (actualResources != null) {

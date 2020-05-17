@@ -94,7 +94,9 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	public void registerBeanDefinitions(Document doc, XmlReaderContext readerContext) {
 		this.readerContext = readerContext;
 		logger.debug("Loading bean definitions");
+		// 获取配置文件根节点。
 		Element root = doc.getDocumentElement();
+		// 使用根节点进行 BeanDefinition 注册。
 		doRegisterBeanDefinitions(root);
 	}
 
@@ -129,11 +131,15 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 		BeanDefinitionParserDelegate parent = this.delegate;
 		this.delegate = createDelegate(getReaderContext(), root, parent);
 
+		// 是默认的命名空间吗：http://www.springframework.org/schema/beans。
 		if (this.delegate.isDefaultNamespace(root)) {
+			// 获取 profile 属性。
 			String profileSpec = root.getAttribute(PROFILE_ATTRIBUTE);
 			if (StringUtils.hasText(profileSpec)) {
+				// profile 属性转数组。允许[,; ](逗号，分号，空格)分隔。
 				String[] specifiedProfiles = StringUtils.tokenizeToStringArray(
 						profileSpec, BeanDefinitionParserDelegate.MULTI_VALUE_ATTRIBUTE_DELIMITERS);
+				// 如果 Environment 不支持 profile，直接跳过不加载。
 				if (!getReaderContext().getEnvironment().acceptsProfiles(specifiedProfiles)) {
 					if (logger.isInfoEnabled()) {
 						logger.info("Skipped XML bean definition file due to specified profiles [" + profileSpec +
@@ -144,8 +150,11 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 			}
 		}
 
+		// 前置处理，空方法，可以继承 DefaultBeanDefinitionDocumentReader 重写。
 		preProcessXml(root);
+		// 解析 BeanDefinition。
 		parseBeanDefinitions(root, this.delegate);
+		// 后置处理，空方法，可以继承 DefaultBeanDefinitionDocumentReader 重写。
 		postProcessXml(root);
 
 		this.delegate = parent;
@@ -163,40 +172,57 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 * Parse the elements at the root level in the document:
 	 * "import", "alias", "bean".
 	 * @param root the DOM root element of the document
+	 *
+	 * 解析 <import>、<alias>、<bean> 标签
 	 */
 	protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate delegate) {
+		// 是默认的命名空间吗：http://www.springframework.org/schema/beans。
 		if (delegate.isDefaultNamespace(root)) {
+			// 获取 Node 列表。
 			NodeList nl = root.getChildNodes();
 			for (int i = 0; i < nl.getLength(); i++) {
+				// 遍历 <beans> 下的子标签，<import>、<alias>、<bean>...
 				Node node = nl.item(i);
+				// 如果是一个标签节点。
 				if (node instanceof Element) {
 					Element ele = (Element) node;
+					// 默认标签解析。
 					if (delegate.isDefaultNamespace(ele)) {
 						parseDefaultElement(ele, delegate);
 					}
+					// 自定义标签解析。
 					else {
 						delegate.parseCustomElement(ele);
 					}
 				}
 			}
 		}
+		// 自定义标签解析。
 		else {
 			delegate.parseCustomElement(root);
 		}
 	}
 
 	private void parseDefaultElement(Element ele, BeanDefinitionParserDelegate delegate) {
+		// <import> 标签。
 		if (delegate.nodeNameEquals(ele, IMPORT_ELEMENT)) {
+			// 使用对应的配置文件，加载 BeanDefinition。
+			// 如果存在配置文件循环 import, 前面 Resource 转 InputSource 会检测出来抛出异常。
 			importBeanDefinitionResource(ele);
 		}
+		// <alias> 标签解析。
 		else if (delegate.nodeNameEquals(ele, ALIAS_ELEMENT)) {
 			processAliasRegistration(ele);
 		}
+		// <bean> 标签解析。
 		else if (delegate.nodeNameEquals(ele, BEAN_ELEMENT)) {
+			// 处理 BeanDefinition 注册。
 			processBeanDefinition(ele, delegate);
 		}
+		// 内嵌 <beans> 标签解析。
 		else if (delegate.nodeNameEquals(ele, NESTED_BEANS_ELEMENT)) {
 			// recurse
+			// 递归注册 BeanDefinition。
 			doRegisterBeanDefinitions(ele);
 		}
 	}
@@ -302,11 +328,13 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 * and registering it with the registry.
 	 */
 	protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
+		// 根据 Element 构建出 BeanDefinitionHolder。
 		BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
 		if (bdHolder != null) {
 			bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
 			try {
 				// Register the final decorated instance.
+				// 使用工具类 BeanDefinitionReaderUtils 注册 BeanDefinition。
 				BeanDefinitionReaderUtils.registerBeanDefinition(bdHolder, getReaderContext().getRegistry());
 			}
 			catch (BeanDefinitionStoreException ex) {
